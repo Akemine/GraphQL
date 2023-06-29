@@ -3,11 +3,12 @@ import { makeExecutableSchema } from '@graphql-tools/schema'
 const typeDefinitions = /* GraphQL */ `
     type Query {
     users: [User!]!
+    hello: String
     user(id: ID!): User
     }
     
     type Mutation {
-    createUser(name: String!): User!
+      createUser(name: String!): User!
     }
     
     type User {
