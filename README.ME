@@ -1,0 +1,132 @@
+API GraphQL Tutoriel
+
+Pour utiliser et voir des résultats, exécuter les commandes suivantes :
+
+// installe les dépendances et le node_modules
+- npm i
+
+// Cette commande initialise le projet Prisma en créant les fichiers de configuration 
+// nécessaires. Elle crée notamment le fichier prisma/schema.prisma, qui contient 
+// la définition du modèle de base de données utilisé par Prisma.
+- npx prisma init 
+
+// Permet de mettre à jour le model
+- npx prisma migrate dev --name "add-user-model"
+
+// Cette commande génère le code client Prisma à partir du modèle de base de données
+// défini dans le fichier schema.prisma. Le code client Prisma permet d'interagir
+// avec la base de données de manière sûre et typée, en utilisant des méthodes et 
+// des types générés automatiquement.
+- npx prisma generate
+
+// NON OBLIGATOIRE
+// Ouvre le visuel de la BDD dans un localhost, une simple interface de gestion
+- npx prisma studio
+
+Jeux d'essai pour essayer l'API
+
+En premier lieu, démarrer l'API avec :
+- npm run dev
+
+puis dans votre url : http://localhost:4000/graphql
+
+Jouer ces Mutations les unes après les autres (pas en même temps)
+
+mutation {
+  postLink(
+		url: "www.test.com",
+    description: "Voici la description d'un site de test !"
+  ) {
+    id
+  }
+}
+
+mutation {
+postLink(
+		url: "www.GraphQLApi.com",
+    description: "Un véritable outil pour vos API !"
+  ) {
+    id
+  }
+}
+
+mutation {
+postLink(
+		url: "www.g00gl3.com",
+    description: "Super moteur de recherche"
+  ) {
+    id
+  }
+}
+
+mutation {
+  postCommentOnLink(
+	linkId: "1",
+    body: "Ce site est génial !"
+  ) {
+    id,
+    body
+  }
+}
+
+mutation {
+  postCommentOnLink(
+	linkId: "1",
+    body: "Ce site permet de faire pleins de test génial"
+  ) {
+    id,
+    body
+  }
+}
+
+mutation {
+  postCommentOnLink(
+	linkId: "2",
+    body: "ça a bien changé g00gl3 !"
+  ) {
+    id,
+    body
+  }
+}
+
+query uniqueLink {
+	uniqueLink(id: 2){
+    id,
+    description
+    comments{
+      id,
+      body
+    }
+  }
+}
+
+query Comment{
+  uniqueComment(id: 3) {
+    body,
+    id,
+    linkId
+  }
+}
+
+query allComment {
+  allComment {
+    id
+    body,
+    linkId,
+    links{
+      description,
+      url,
+    }
+  }
+}
+
+Pour tester le filtering ainsi que la pagination
+
+query {
+  allLink(filterNeedle: "outil", skip:0, take: 1) {
+    id
+    description
+    url
+  }
+}
+

@@ -20,14 +20,45 @@ const parseIntSafe = (value: string): number | null => {
   return null
 }
 
+// Function qui ajoute une contrainte pour ne pas envoyer un nombre trop énorme de réponse à la requête
+const applyTakeConstraints = (params: {
+  min: number
+  max: number
+  value: number
+}) => {
+  if (params.value < params.min || params.value > params.max) {
+    throw new GraphQLError(
+      `'take' argument value '${params.value}' is outside the valid range of '${params.min}' to '${params.max}'.`
+    )
+  }
+  return params.value
+}
+
 const resolvers = {
   Query: {
     allLink: async (
       parent: unknown,
-      args: {}, 
+      args: {filterNeedle?: string; skip?: number; take?: number}, 
       context: GraphQLContext
       ) => {
-        return context.prisma.link.findMany()
+        const where = args.filterNeedle
+        ? {
+            OR: [
+              { description: { contains: args.filterNeedle } },
+              { url: { contains: args.filterNeedle } }
+            ]
+          }
+        : {}
+        const take = applyTakeConstraints({
+          min: 1,
+          max: 50,
+          value: args.take ?? 30 // Default Value
+        })
+        return context.prisma.link.findMany({
+          where,
+          skip: args.skip,
+          take
+        })
     },
     uniqueLink: async (
       parent: unknown,
