@@ -1,3 +1,7 @@
+import { APP_SECRET } from '../auth'
+import { hash, compare } from 'bcryptjs'
+import { sign } from 'jsonwebtoken'
+
 // Import pour lire le schema
 import { readFileSync } from 'fs';
 const typeDefs = readFileSync('src\\schema\\schema.graphql', { encoding: 'utf-8' });
@@ -5,8 +9,7 @@ const typeDefs = readFileSync('src\\schema\\schema.graphql', { encoding: 'utf-8'
 // Import fonction Prisma & GraphQL
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import type { GraphQLContext } from '../context'
-import type { Link } from '@prisma/client'
-import type { Comment } from '@prisma/client'
+import type { Link, Comment, User, Vote } from '@prisma/client'
 
 // Import de la gestion d'erreur
 import { GraphQLError } from 'graphql'
@@ -82,16 +85,53 @@ const resolvers = {
       return context.prisma.comment.findUnique({
         where: { id: parseInt(args.id) }
       })
-    }
+    },
+    me(parent: unknown, args: {}, context: GraphQLContext) {
+      if (context.currentUser === null) {
+        throw new Error('Unauthenticated!')
+      }
+ 
+      return context.currentUser
+    },
+    getUser(parent: unknown, args: {id: string}, context: GraphQLContext) {
+      if (context.currentUser === null) {
+        throw new Error('Unauthenticated!')
+      }
 
+      return context.prisma.user.findUnique({where: {id: parseInt(args.id)}})
+    },
+
+  },
+  User: {
+    links: (parent: User, args: {}, context: GraphQLContext) =>
+      context.prisma.user.findUnique({ where: { id: parent.id } }).links()
   },
   Link: {
     id: (parent: Link) => parent.id,
     description: (parent: Link) => parent.description,
     url: (parent: Link) => parent.url,
-    comments: (parent: Link, args:{}, context: GraphQLContext)=> {
-      return context.prisma.comment.findMany({where: {linkId: parent.id}})
+    postedBy(parent: Link, args: {}, context: GraphQLContext) {
+      if (!parent.postedById) {
+        return null
+      }
+ 
+      return context.prisma.link
+        .findUnique({ where: { id: parent.id } })
+        .postedBy()
     },
+    votes(parent: Link, args: {}, context:GraphQLContext) {
+      return context.prisma.link.findUnique({where: {id : parent.id}}).votes()
+    }
+  },
+  Vote: {
+    id: (parent: Vote) => parent.id,
+    link(parent: Link, args: {}, context: GraphQLContext) {
+      return context.prisma.vote
+        .findUnique({ where: { id: parent.id } }).link()
+    },
+    user(parent: Link, args: {}, context:GraphQLContext) {
+      return context.prisma.vote.findUnique({where: {id : parent.id}}).user()
+    }
   },
   Comment: {
     id: (parent: Comment) => parent.id,
@@ -102,17 +142,68 @@ const resolvers = {
     },
   },
   Mutation: {
-    async postLink(
+    async login(
       parent: unknown,
-      args: { description: string; url: string },
+      args: { email: string; password: string },
       context: GraphQLContext
     ) {
+      // 1
+      const user = await context.prisma.user.findUnique({
+        where: { email: args.email }
+      })
+      if (!user) {
+        throw new Error('No such user found')
+      }
+ 
+      // 2
+      const valid = await compare(args.password, user.password)
+      if (!valid) {
+        throw new Error('Invalid password')
+      }
+ 
+      const token = sign({ userId: user.id }, APP_SECRET)
+ 
+      // 3
+      return { token, user }
+    },
+    async signup(
+      parent: unknown,
+      args: { email: string; password: string; name: string },
+      context: GraphQLContext
+    ) {
+      // 1
+      const password = await hash(args.password, 10)
+ 
+      // 2
+      const user = await context.prisma.user.create({
+        data: { ...args, password }
+      })
+ 
+      // 3
+      const token = sign({ userId: user.id }, APP_SECRET)
+ 
+      // 4
+      return { token, user }
+    },
+    async postLink(
+      parent: unknown,
+      args: { url: string; description: string },
+      context: GraphQLContext
+    ) {
+      if (context.currentUser === null) {
+        throw new GraphQLError('Unauthenticated!')
+      }
+ 
       const newLink = await context.prisma.link.create({
         data: {
           url: args.url,
-          description: args.description
+          description: args.description,
+          postedBy: { connect: { id: context.currentUser.id } }
         }
       })
+ 
+      context.pubSub.publish('newLink', { newLink })
+ 
       return newLink
     },
     async postCommentOnLink(
@@ -148,6 +239,48 @@ const resolvers = {
         return Promise.reject(err)
       })
       return newComment
+    },
+    async vote(
+      parent: unknown,
+      args: { linkId: string },
+      context: GraphQLContext
+    ) {
+      if (!context.currentUser) {
+        throw new GraphQLError('You must login in order to use upvote!')
+      }
+      
+      const userId = context.currentUser.id
+      const linkId = parseInt(args.linkId)
+
+      const voteExist = await context.prisma.vote.findUnique({ where: {
+        linkId_userId: {
+          linkId: linkId,
+          userId: userId
+        }}
+      })
+      if (voteExist !== null) {
+        throw new Error(`Already voted for link: ${args.linkId}`)
+      }
+      const newVote = await context.prisma.vote.create({
+        data: {
+          linkId: linkId,
+          userId: userId
+        }
+      })
+      
+      context.pubSub.publish('newVote', { newVote })
+
+      return newVote
+    }
+  },
+  Subscription: {
+    newLink: {
+      subscribe: (parent: unknown, args: {}, context: GraphQLContext) =>
+        context.pubSub.subscribe('newLink')
+    },
+    newVote: {
+      subscribe: (parent: unknown, args: {}, context: GraphQLContext) =>
+        context.pubSub.subscribe('newVote')
     }
   }
 }
