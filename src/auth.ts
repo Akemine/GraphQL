@@ -9,13 +9,13 @@ export async function authenticateUser(
 ): Promise<User | null> {
   const header = request.headers.get('authorization')
   if (header !== null) {
-    // 1
+    // Split authorization pour retirer le "bearer"
     const token = header.split(' ')[1]
-    // 2
+    // vérification du token
     const tokenPayload = verify(token, APP_SECRET) as JwtPayload
-    // 3
+    // user du token valide
     const userId = tokenPayload.userId
-    // 4
+    // retourne le user via son ID
     return await prisma.user.findUnique({ where: { id: userId } })
   }
  

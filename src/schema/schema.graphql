@@ -4,8 +4,8 @@ type Query {
     uniqueLink(id: Int!): Link! # Retourne tous les "Links" en SQLite via son id
     allComment: [Comment!]! # Retourne tous les "Comment" en SQLite
     uniqueComment(id: Int!): Comment! # Retourne un "Comment" en SQLite via son id
-    me: User!
-    getUser(id: Int!): User!
+    me: User! # Retourne le user grâce au token reçu du login
+    getUser(id: Int!): User! # Retourne le user grâce à l'id fourni
 }
 
 type Mutation {
@@ -13,7 +13,7 @@ type Mutation {
     postCommentOnLink(linkId: ID!, body: String!): Comment! # Ajoute un Comment à un Link en SQLite en lui fournissant un body
     signup(email: String!, password: String!, name: String!): AuthPayload # Crée un compte
     login(email: String!, password: String!): AuthPayload # S'authentifie
-    vote(linkId: ID!): Vote
+    vote(linkId: ID!): Vote # Ajoute un upvote
 }
 
 type Link {
@@ -55,12 +55,14 @@ type Vote {
   user: User!
 }
 
+# Permet de filtrer par description, url, createdAt....
 input LinkOrderByInput {
   description: Sort
   url: Sort
   createdAt: Sort
 }
  
+# Les types de filter disponible
 enum Sort {
   asc
   desc

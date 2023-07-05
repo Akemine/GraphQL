@@ -1,3 +1,4 @@
+// Util pour l'auth/token/hash du password
 import { APP_SECRET } from '../auth'
 import { hash, compare } from 'bcryptjs'
 import { sign } from 'jsonwebtoken'
@@ -37,6 +38,7 @@ const applyTakeConstraints = (params: {
   return params.value
 }
 
+// Les résolvers
 const resolvers = {
   Query: {
     allLink: async (
@@ -148,7 +150,7 @@ const resolvers = {
       args: { email: string; password: string },
       context: GraphQLContext
     ) {
-      // 1
+      // retrouve le user par son email
       const user = await context.prisma.user.findUnique({
         where: { email: args.email }
       })
@@ -156,15 +158,15 @@ const resolvers = {
         throw new Error('No such user found')
       }
  
-      // 2
+      // compare le hash du password
       const valid = await compare(args.password, user.password)
       if (!valid) {
         throw new Error('Invalid password')
       }
  
+      // retourne le token de l'utilisateur a utiliser dans l'authorization
       const token = sign({ userId: user.id }, APP_SECRET)
- 
-      // 3
+
       return { token, user }
     },
     async signup(
@@ -172,15 +174,15 @@ const resolvers = {
       args: { email: string; password: string; name: string },
       context: GraphQLContext
     ) {
-      // 1
+      // Hash le password fourni
       const password = await hash(args.password, 10)
  
-      // 2
+      // Post le user avec ces args fourni et le hash du password
       const user = await context.prisma.user.create({
         data: { ...args, password }
       })
  
-      // 3
+      // crée le token
       const token = sign({ userId: user.id }, APP_SECRET)
  
       // 4
@@ -191,10 +193,12 @@ const resolvers = {
       args: { url: string; description: string },
       context: GraphQLContext
     ) {
+      // Vérifie, via l'auth, la validité du token
       if (context.currentUser === null) {
         throw new GraphQLError('Unauthenticated!')
       }
  
+      // Créer le lien
       const newLink = await context.prisma.link.create({
         data: {
           url: args.url,
@@ -203,6 +207,7 @@ const resolvers = {
         }
       })
  
+      // Subscription
       context.pubSub.publish('newLink', { newLink })
  
       return newLink
@@ -220,6 +225,7 @@ const resolvers = {
           )
         )
       }
+      // Créer le commentaire
       const newComment = await context.prisma.comment.create({
         data: {
           linkId: parseInt(args.linkId),
@@ -250,9 +256,11 @@ const resolvers = {
         throw new GraphQLError('You must login in order to use upvote!')
       }
       
+      // On récupère les 2 id nécessaire
       const userId = context.currentUser.id
       const linkId = parseInt(args.linkId)
 
+      // Si la personne a déjà voté, elle ne peut pas le refaire.
       const voteExist = await context.prisma.vote.findUnique({ where: {
         linkId_userId: {
           linkId: linkId,
@@ -262,6 +270,7 @@ const resolvers = {
       if (voteExist !== null) {
         throw new Error(`Already voted for link: ${args.linkId}`)
       }
+      // Sinon, on vote !
       const newVote = await context.prisma.vote.create({
         data: {
           linkId: linkId,
@@ -269,6 +278,7 @@ const resolvers = {
         }
       })
       
+      // Subscription
       context.pubSub.publish('newVote', { newVote })
 
       return newVote
