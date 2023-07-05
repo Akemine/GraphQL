@@ -9,7 +9,7 @@ const typeDefs = readFileSync('src\\schema\\schema.graphql', { encoding: 'utf-8'
 // Import fonction Prisma & GraphQL
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import type { GraphQLContext } from '../context'
-import type { Link, Comment, User, Vote } from '@prisma/client'
+import type { Link, Comment, User, Vote, Prisma } from '@prisma/client'
 
 // Import de la gestion d'erreur
 import { GraphQLError } from 'graphql'
@@ -41,7 +41,7 @@ const resolvers = {
   Query: {
     allLink: async (
       parent: unknown,
-      args: {filterNeedle?: string; skip?: number; take?: number}, 
+      args: {filterNeedle?: string; skip?: number; take?: number, orderBy?: { description?: Prisma.SortOrder, url?: Prisma.SortOrder, createdAt?: Prisma.SortOrder}}, 
       context: GraphQLContext
       ) => {
         const where = args.filterNeedle
@@ -60,7 +60,8 @@ const resolvers = {
         return context.prisma.link.findMany({
           where,
           skip: args.skip,
-          take
+          take,
+          orderBy: args.orderBy
         })
     },
     uniqueLink: async (

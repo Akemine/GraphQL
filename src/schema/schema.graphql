@@ -1,5 +1,6 @@
 type Query {
-    allLink(filterNeedle: String, skip: Int, take: Int): [Link!]! # Retourne tous les "Links" en SQLite
+    allLink(
+    filterNeedle: String skip: Int take: Int orderBy: LinkOrderByInput): [Link!]! # Retourne tous les "Links" en SQLite
     uniqueLink(id: Int!): Link! # Retourne tous les "Links" en SQLite via son id
     allComment: [Comment!]! # Retourne tous les "Comment" en SQLite
     uniqueComment(id: Int!): Comment! # Retourne un "Comment" en SQLite via son id
@@ -52,4 +53,15 @@ type Vote {
   id: ID!
   link: Link!
   user: User!
+}
+
+input LinkOrderByInput {
+  description: Sort
+  url: Sort
+  createdAt: Sort
+}
+ 
+enum Sort {
+  asc
+  desc
 }
